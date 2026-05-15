@@ -151,6 +151,33 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
+app.get("/api/threads/:threadId", async (req, res) => {
+  try {
+    const memory = await chatAgent.getMemory();
+    if (!memory) {
+      res.json({ messages: [] });
+      return;
+    }
+
+    const { messages } = await memory.recall({
+      threadId: req.params.threadId,
+      resourceId: "local-user"
+    });
+
+    const formatted = messages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => {
+        const textPart = m.content.parts.find((p) => (p as { type: string }).type === "text");
+        const content = textPart ? (textPart as { type: string; text: string }).text : "";
+        return { role: m.role as "user" | "assistant", content };
+      });
+
+    res.json({ messages: formatted });
+  } catch {
+    res.json({ messages: [] });
+  }
+});
+
 app.listen(port, () => {
   console.log(`API server listening on http://localhost:${port}`);
 });
