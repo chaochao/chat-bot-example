@@ -17,7 +17,58 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true });
+  const routes: string[] = [];
+  app._router?.stack?.forEach((r: { route?: { path: string; methods: Record<string, boolean> } }) => {
+    if (r.route?.path) {
+      const methods = Object.keys(r.route.methods).join(",");
+      routes.push(`${methods.toUpperCase()} ${r.route.path}`);
+    }
+  });
+  res.json({ ok: true, routes });
+});
+
+app.get("/api/threads", async (_req, res) => {
+  logServer("GET /api/threads called");
+  try {
+    const memory = await chatAgent.getMemory();
+    if (!memory) {
+      res.json({ threads: [] });
+      return;
+    }
+
+    const result = await memory.listThreads({
+      filter: { resourceId: "local-user" },
+      perPage: false
+    });
+
+    const threads = await Promise.all(
+      result.threads.map(async (thread) => {
+        const { messages } = await memory.recall({
+          threadId: thread.id,
+          resourceId: "local-user"
+        });
+        const firstUser = messages.find((m) => m.role === "user");
+        const part = firstUser?.content?.parts?.find(
+          (p: { type: string }) => p.type === "text"
+        ) as { type: string; text: string } | undefined;
+        const title = part?.text?.slice(0, 80) ?? "New conversation";
+        return {
+          id: thread.id,
+          title,
+          createdAt: thread.createdAt instanceof Date
+            ? thread.createdAt.toISOString()
+            : String(thread.createdAt)
+        };
+      })
+    );
+
+    threads.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    res.json({ threads });
+  } catch (err) {
+    logServer("Failed to fetch thread list.", { error: String(err) });
+    res.json({ threads: [] });
+  }
 });
 
 /**
@@ -151,43 +202,18 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-app.get("/api/threads", async (_req, res) => {
+app.delete("/api/threads/:threadId", async (req, res) => {
   try {
     const memory = await chatAgent.getMemory();
-    if (!memory) return res.json({ threads: [] });
-
-    const result = await memory.listThreads({
-      filter: { resourceId: "local-user" },
-      perPage: false
-    });
-
-    const threads = await Promise.all(
-      result.threads.map(async (thread) => {
-        const { messages } = await memory.recall({
-          threadId: thread.id,
-          resourceId: "local-user"
-        });
-        const firstUser = messages.find((m) => m.role === "user");
-        const part = firstUser?.content?.parts?.find(
-          (p: { type: string }) => p.type === "text"
-        ) as { type: string; text: string } | undefined;
-        const title = part?.text?.slice(0, 80) ?? "New conversation";
-        return {
-          id: thread.id,
-          title,
-          createdAt: thread.createdAt instanceof Date
-            ? thread.createdAt.toISOString()
-            : String(thread.createdAt)
-        };
-      })
-    );
-
-    threads.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    res.json({ threads });
-  } catch {
-    logServer("Failed to fetch thread list.");
-    res.json({ threads: [] });
+    if (!memory) {
+      res.status(404).json({ error: "Memory not available" });
+      return;
+    }
+    await memory.deleteThread(req.params.threadId);
+    res.json({ ok: true });
+  } catch (err) {
+    logServer("Failed to delete thread.", { error: String(err) });
+    res.status(500).json({ error: "Failed to delete thread" });
   }
 });
 

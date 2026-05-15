@@ -1,5 +1,8 @@
 import React, { FormEvent, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import "./styles.css";
 
 const THREAD_ID_KEY = "chat_thread_id";
@@ -39,36 +42,16 @@ const initialMessages: ChatMessage[] = [
   }
 ];
 
-/**
- * Reads one SSE frame and converts it into a small JavaScript object.
- *
- * This parser supports the simple event/data frames emitted by our backend.
- * It intentionally keeps the format visible for learning the SSE protocol.
- */
 function parseSseFrame(frame: string): SseEvent | null {
-  const eventLine = frame
-    .split("\n")
-    .find((line) => line.startsWith("event:"));
-  const dataLine = frame
-    .split("\n")
-    .find((line) => line.startsWith("data:"));
-
-  if (!eventLine || !dataLine) {
-    return null;
-  }
-
+  const eventLine = frame.split("\n").find((line) => line.startsWith("event:"));
+  const dataLine = frame.split("\n").find((line) => line.startsWith("data:"));
+  if (!eventLine || !dataLine) return null;
   return {
     event: eventLine.replace("event:", "").trim(),
     data: JSON.parse(dataLine.replace("data:", "").trim())
   };
 }
 
-/**
- * Splits accumulated response text into complete SSE frames.
- *
- * Network chunks do not always align with SSE frame boundaries, so this keeps
- * the unfinished tail in `buffer` and returns only complete frames.
- */
 function extractSseFrames(buffer: string) {
   const parts = buffer.split("\n\n");
   const remainder = parts.pop() ?? "";
@@ -87,17 +70,7 @@ function formatRelativeTime(isoDate: string): string {
   return `${days}d ago`;
 }
 
-/**
- * Appends streamed assistant text to the placeholder assistant message.
- *
- * The assistant message is created before the request starts, then each delta
- * mutates only that one message so the UI feels like ChatGPT-style streaming.
- */
-function appendToMessage(
-  messages: ChatMessage[],
-  messageId: string,
-  text: string
-) {
+function appendToMessage(messages: ChatMessage[], messageId: string, text: string) {
   return messages.map((message) =>
     message.id === messageId
       ? { ...message, content: message.content + text }
@@ -127,6 +100,16 @@ function App() {
     setMessages(initialMessages);
   }
 
+  async function handleDeleteThread(id: string) {
+    await fetch(`/api/threads/${id}`, { method: "DELETE" });
+    if (id === threadId) {
+      localStorage.removeItem(THREAD_ID_KEY);
+      setThreadId(getOrCreateThreadId());
+      setMessages(initialMessages);
+    }
+    fetchThreads();
+  }
+
   useEffect(() => {
     fetchThreads();
   }, []);
@@ -146,33 +129,15 @@ function App() {
     return () => { cancelled = true; };
   }, [threadId]);
 
-  /**
-   * Sends the current conversation to the API and consumes the SSE response.
-   *
-   * `fetch` is used instead of `EventSource` because this chat flow needs POST
-   * body data. The response still uses SSE frames for simple streaming.
-   */
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     const prompt = input.trim();
-    if (prompt === "" || isStreaming) {
-      return;
-    }
+    if (prompt === "" || isStreaming) return;
 
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: prompt
-    };
-    const assistantMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: ""
-    };
-    const nextMessages = [...messages, userMessage, assistantMessage];
+    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: "user", content: prompt };
+    const assistantMessage: ChatMessage = { id: crypto.randomUUID(), role: "assistant", content: "" };
 
-    setMessages(nextMessages);
+    setMessages([...messages, userMessage, assistantMessage]);
     setInput("");
     setError(null);
     setIsStreaming(true);
@@ -180,11 +145,7 @@ function App() {
     try {
       await streamChatResponse(prompt, threadId, assistantMessage.id);
     } catch (streamError) {
-      const message =
-        streamError instanceof Error
-          ? streamError.message
-          : "The chat stream failed.";
-      setError(message);
+      setError(streamError instanceof Error ? streamError.message : "The chat stream failed.");
     } finally {
       setIsStreaming(false);
       inputRef.current?.focus();
@@ -192,17 +153,7 @@ function App() {
     }
   }
 
-  /**
-   * Reads the backend response stream and applies each SSE event to React state.
-   *
-   * The `delta` event appends assistant text, `done` ends normally, and `error`
-   * turns the server-side problem into a UI error.
-   */
-  async function streamChatResponse(
-    message: string,
-    threadId: string,
-    assistantMessageId: string
-  ) {
+  async function streamChatResponse(message: string, threadId: string, assistantMessageId: string) {
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -220,10 +171,7 @@ function App() {
 
     while (true) {
       const { done, value } = await reader.read();
-
-      if (done) {
-        break;
-      }
+      if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
       const { frames, remainder } = extractSseFrames(buffer);
@@ -231,9 +179,7 @@ function App() {
 
       for (const frame of frames) {
         const parsed = parseSseFrame(frame);
-        if (!parsed) {
-          continue;
-        }
+        if (!parsed) continue;
 
         if (parsed.event === "delta") {
           const { text } = parsed.data as { text: string };
@@ -254,32 +200,43 @@ function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-header">
-          <button
-            className="new-chat-btn"
-            type="button"
+          <Button
+            variant="default"
+            className="w-full h-12 text-sm font-medium"
             disabled={isStreaming}
             onClick={() => {
               localStorage.removeItem(THREAD_ID_KEY);
               setThreadId(getOrCreateThreadId());
               setMessages(initialMessages);
+              fetchThreads();
             }}
           >
             New Chat
-          </button>
+          </Button>
         </div>
-        <div className="sidebar-threads">
-          {threads.map((thread) => (
-            <button
-              key={thread.id}
-              type="button"
-              className={`thread-item${thread.id === threadId ? " active" : ""}`}
-              onClick={() => handleSelectThread(thread.id)}
-            >
-              <span className="thread-title">{thread.title}</span>
-              <span className="thread-time">{formatRelativeTime(thread.createdAt)}</span>
-            </button>
-          ))}
-        </div>
+        <ScrollArea className="flex-1">
+          <div className="px-2 pb-4 pt-1">
+            {threads.map((thread) => (
+              <button
+                key={thread.id}
+                type="button"
+                className={`thread-item${thread.id === threadId ? " active" : ""}`}
+                onClick={() => handleSelectThread(thread.id)}
+              >
+                <span className="thread-title">{thread.title}</span>
+                <span className="thread-time">{formatRelativeTime(thread.createdAt)}</span>
+                <span
+                  className="thread-delete"
+                  role="button"
+                  aria-label="Delete conversation"
+                  onClick={(e) => { e.stopPropagation(); handleDeleteThread(thread.id); }}
+                >
+                  ×
+                </span>
+              </button>
+            ))}
+          </div>
+        </ScrollArea>
       </aside>
 
       <main className="chat-panel" aria-label="Chat conversation">
@@ -291,33 +248,40 @@ function App() {
           <span className={isStreaming ? "status live" : "status"} />
         </header>
 
-        <div className="message-list">
-          {messages.map((message) => (
-            <article
-              className={`message ${message.role}`}
-              key={message.id}
-              aria-label={`${message.role} message`}
-            >
-              <div className="message-role">{message.role}</div>
-              <p>{message.content || "..."}</p>
-            </article>
-          ))}
-        </div>
+        <ScrollArea className="flex-1 overflow-hidden">
+          <div className="message-list">
+            {messages.map((message) => (
+              <article
+                className={`message ${message.role}`}
+                key={message.id}
+                aria-label={`${message.role} message`}
+              >
+                <div className="message-role">{message.role}</div>
+                <p>{message.content || "..."}</p>
+              </article>
+            ))}
+          </div>
+        </ScrollArea>
 
         {error && <div className="error-banner">{error}</div>}
 
         <form className="composer" onSubmit={handleSubmit}>
-          <textarea
+          <Textarea
             ref={inputRef}
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder="Send a message"
             rows={2}
             disabled={isStreaming}
+            className="min-h-[56px] max-h-40 resize-y text-base leading-relaxed"
           />
-          <button type="submit" disabled={isStreaming || input.trim() === ""}>
+          <Button
+            type="submit"
+            disabled={isStreaming || input.trim() === ""}
+            className="h-[56px] min-w-[88px] text-base font-medium"
+          >
             Send
-          </button>
+          </Button>
         </form>
       </main>
     </div>
