@@ -1,6 +1,16 @@
-import React, { FormEvent, useMemo, useRef, useState } from "react";
+import React, { FormEvent, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
+
+const THREAD_ID_KEY = "chat_thread_id";
+
+function getOrCreateThreadId(): string {
+  const existing = localStorage.getItem(THREAD_ID_KEY);
+  if (existing) return existing;
+  const id = crypto.randomUUID();
+  localStorage.setItem(THREAD_ID_KEY, id);
+  return id;
+}
 
 type ChatRole = "user" | "assistant";
 
@@ -83,14 +93,20 @@ function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [threadId, setThreadId] = useState<string>(getOrCreateThreadId);
 
-  const apiMessages = useMemo(
-    () =>
-      messages
-        .filter((message) => message.content.trim() !== "")
-        .map(({ role, content }) => ({ role, content })),
-    [messages]
-  );
+  useEffect(() => {
+    fetch(`/api/threads/${threadId}`)
+      .then((r) => r.json())
+      .then(({ messages: history }: { messages: Array<{ role: ChatRole; content: string }> }) => {
+        if (history.length === 0) return;
+        setMessages([
+          ...initialMessages,
+          ...history.map((m) => ({ id: crypto.randomUUID(), role: m.role, content: m.content }))
+        ]);
+      })
+      .catch(() => {});
+  }, [threadId]);
 
   /**
    * Sends the current conversation to the API and consumes the SSE response.
@@ -124,10 +140,7 @@ function App() {
     setIsStreaming(true);
 
     try {
-      await streamChatResponse(
-        [...apiMessages, { role: "user", content: prompt }],
-        assistantMessage.id
-      );
+      await streamChatResponse(prompt, threadId, assistantMessage.id);
     } catch (streamError) {
       const message =
         streamError instanceof Error
@@ -147,13 +160,14 @@ function App() {
    * turns the server-side problem into a UI error.
    */
   async function streamChatResponse(
-    requestMessages: Array<{ role: ChatRole; content: string }>,
+    message: string,
+    threadId: string,
     assistantMessageId: string
   ) {
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: requestMessages })
+      body: JSON.stringify({ message, threadId })
     });
 
     if (!response.ok || !response.body) {
@@ -205,7 +219,20 @@ function App() {
             <h1>Mastra SSE Chat</h1>
             <p>POST a message, stream the agent response back as SSE.</p>
           </div>
-          <span className={isStreaming ? "status live" : "status"} />
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <button
+              type="button"
+              disabled={isStreaming}
+              onClick={() => {
+                localStorage.removeItem(THREAD_ID_KEY);
+                setThreadId(getOrCreateThreadId());
+                setMessages(initialMessages);
+              }}
+            >
+              New Chat
+            </button>
+            <span className={isStreaming ? "status live" : "status"} />
+          </div>
         </header>
 
         <div className="message-list">
