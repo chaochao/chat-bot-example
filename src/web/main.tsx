@@ -96,16 +96,18 @@ function App() {
   const [threadId, setThreadId] = useState<string>(getOrCreateThreadId);
 
   useEffect(() => {
+    let cancelled = false;
     fetch(`/api/threads/${threadId}`)
       .then((r) => r.json())
       .then(({ messages: history }: { messages: Array<{ role: ChatRole; content: string }> }) => {
-        if (history.length === 0) return;
+        if (cancelled || history.length === 0) return;
         setMessages([
           ...initialMessages,
           ...history.map((m) => ({ id: crypto.randomUUID(), role: m.role, content: m.content }))
         ]);
       })
       .catch(() => {});
+    return () => { cancelled = true; };
   }, [threadId]);
 
   /**
