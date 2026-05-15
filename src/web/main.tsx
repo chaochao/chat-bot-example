@@ -20,6 +20,12 @@ type ChatMessage = {
   content: string;
 };
 
+type Thread = {
+  id: string;
+  title: string;
+  createdAt: string;
+};
+
 type SseEvent = {
   event: string;
   data: unknown;
@@ -69,6 +75,18 @@ function extractSseFrames(buffer: string) {
   return { frames: parts, remainder };
 }
 
+function formatRelativeTime(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "yesterday";
+  return `${days}d ago`;
+}
+
 /**
  * Appends streamed assistant text to the placeholder assistant message.
  *
@@ -94,6 +112,24 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [threadId, setThreadId] = useState<string>(getOrCreateThreadId);
+  const [threads, setThreads] = useState<Thread[]>([]);
+
+  function fetchThreads() {
+    fetch("/api/threads")
+      .then((r) => r.json())
+      .then(({ threads: list }: { threads: Thread[] }) => setThreads(list))
+      .catch(() => {});
+  }
+
+  function handleSelectThread(id: string) {
+    localStorage.setItem(THREAD_ID_KEY, id);
+    setThreadId(id);
+    setMessages(initialMessages);
+  }
+
+  useEffect(() => {
+    fetchThreads();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -152,6 +188,7 @@ function App() {
     } finally {
       setIsStreaming(false);
       inputRef.current?.focus();
+      fetchThreads();
     }
   }
 
@@ -214,27 +251,44 @@ function App() {
   }
 
   return (
-    <main className="chat-shell">
-      <section className="chat-panel" aria-label="Chat conversation">
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <button
+            className="new-chat-btn"
+            type="button"
+            disabled={isStreaming}
+            onClick={() => {
+              localStorage.removeItem(THREAD_ID_KEY);
+              setThreadId(getOrCreateThreadId());
+              setMessages(initialMessages);
+            }}
+          >
+            New Chat
+          </button>
+        </div>
+        <div className="sidebar-threads">
+          {threads.map((thread) => (
+            <button
+              key={thread.id}
+              type="button"
+              className={`thread-item${thread.id === threadId ? " active" : ""}`}
+              onClick={() => handleSelectThread(thread.id)}
+            >
+              <span className="thread-title">{thread.title}</span>
+              <span className="thread-time">{formatRelativeTime(thread.createdAt)}</span>
+            </button>
+          ))}
+        </div>
+      </aside>
+
+      <main className="chat-panel" aria-label="Chat conversation">
         <header className="chat-header">
           <div>
             <h1>Mastra SSE Chat</h1>
             <p>POST a message, stream the agent response back as SSE.</p>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <button
-              type="button"
-              disabled={isStreaming}
-              onClick={() => {
-                localStorage.removeItem(THREAD_ID_KEY);
-                setThreadId(getOrCreateThreadId());
-                setMessages(initialMessages);
-              }}
-            >
-              New Chat
-            </button>
-            <span className={isStreaming ? "status live" : "status"} />
-          </div>
+          <span className={isStreaming ? "status live" : "status"} />
         </header>
 
         <div className="message-list">
@@ -265,8 +319,8 @@ function App() {
             Send
           </button>
         </form>
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }
 

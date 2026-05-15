@@ -151,6 +151,46 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
+app.get("/api/threads", async (_req, res) => {
+  try {
+    const memory = await chatAgent.getMemory();
+    if (!memory) return res.json({ threads: [] });
+
+    const result = await memory.listThreads({
+      filter: { resourceId: "local-user" },
+      perPage: false
+    });
+
+    const threads = await Promise.all(
+      result.threads.map(async (thread) => {
+        const { messages } = await memory.recall({
+          threadId: thread.id,
+          resourceId: "local-user"
+        });
+        const firstUser = messages.find((m) => m.role === "user");
+        const part = firstUser?.content?.parts?.find(
+          (p: { type: string }) => p.type === "text"
+        ) as { type: string; text: string } | undefined;
+        const title = part?.text?.slice(0, 80) ?? "New conversation";
+        return {
+          id: thread.id,
+          title,
+          createdAt: thread.createdAt instanceof Date
+            ? thread.createdAt.toISOString()
+            : String(thread.createdAt)
+        };
+      })
+    );
+
+    threads.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    res.json({ threads });
+  } catch {
+    logServer("Failed to fetch thread list.");
+    res.json({ threads: [] });
+  }
+});
+
 app.get("/api/threads/:threadId", async (req, res) => {
   try {
     const memory = await chatAgent.getMemory();
