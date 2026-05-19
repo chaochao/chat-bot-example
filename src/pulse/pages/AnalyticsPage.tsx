@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { format, startOfMonth, endOfMonth, differenceInDays } from 'date-fns'
-import { Sun, Moon, ChevronUp, ChevronDown } from 'lucide-react'
+import { Sun, Moon, ChevronUp, ChevronDown, Flame } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useShifts } from '@/pulse/hooks/useShifts'
 import { useStaff } from '@/pulse/hooks/useStaff'
@@ -9,7 +9,19 @@ import { usePatients } from '@/pulse/hooks/usePatients'
 
 const MAX_HOURS_PER_WEEK = 40
 
-type SortKey = 'name' | 'role' | 'dept' | 'total' | 'day' | 'night' | 'hours'
+function longestStreak(dates: string[]): number {
+  const unique = [...new Set(dates)].sort()
+  if (unique.length === 0) return 0
+  let max = 1, cur = 1
+  for (let i = 1; i < unique.length; i++) {
+    const diff = differenceInDays(new Date(unique[i]), new Date(unique[i - 1]))
+    if (diff === 1) { cur++; if (cur > max) max = cur }
+    else cur = 1
+  }
+  return max
+}
+
+type SortKey = 'name' | 'role' | 'dept' | 'total' | 'day' | 'night' | 'hours' | 'streak'
 type SortDir = 'asc' | 'desc'
 
 export function AnalyticsPage() {
@@ -76,8 +88,9 @@ export function AnalyticsPage() {
       const day = staffShifts.filter(s => s.type === 'day').length
       const night = staffShifts.filter(s => s.type === 'night').length
       const hours = staffShifts.reduce((sum, s) => sum + s.hours, 0)
+      const streak = longestStreak(staffShifts.map(s => s.date.substring(0, 10)))
       const dept = deptMap[staff.departmentId]
-      return { staff, dept, total: staffShifts.length, day, night, hours }
+      return { staff, dept, total: staffShifts.length, day, night, hours, streak }
     })
 
     return data.sort((a, b) => {
@@ -89,6 +102,7 @@ export function AnalyticsPage() {
       else if (sortKey === 'day') cmp = a.day - b.day
       else if (sortKey === 'night') cmp = a.night - b.night
       else if (sortKey === 'hours') cmp = a.hours - b.hours
+      else if (sortKey === 'streak') cmp = a.streak - b.streak
       return sortDir === 'asc' ? cmp : -cmp
     })
   }, [shifts, allStaff, departments, deptFilter, sortKey, sortDir])
@@ -162,6 +176,7 @@ export function AnalyticsPage() {
                   { key: 'day', label: 'Day', align: 'right', icon: <Sun size={12} className="text-[#f59e0b]" /> },
                   { key: 'night', label: 'Night', align: 'right', icon: <Moon size={12} className="text-[#6366f1]" /> },
                   { key: 'hours', label: 'Hours', align: 'right' },
+                  { key: 'streak', label: 'Consec. Days', align: 'right', icon: <Flame size={12} className="text-[#f97316]" /> },
                 ] as { key: SortKey; label: string; align: string; icon?: React.ReactNode }[]).map(col => (
                   <th
                     key={col.key}
@@ -182,7 +197,7 @@ export function AnalyticsPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ staff, dept, total, day, night, hours }) => {
+              {rows.map(({ staff, dept, total, day, night, hours, streak }) => {
                 const overLimit = hours > maxHoursForPeriod
                 return (
                 <tr key={staff.id} className={`border-b border-[#f5f5f5] transition-colors ${overLimit ? 'bg-red-50 hover:bg-red-50' : 'hover:bg-[#fafafa]'}`}>
@@ -204,16 +219,26 @@ export function AnalyticsPage() {
                   <td className="py-2.5 pr-4 text-right font-semibold text-[#222222]">{total}</td>
                   <td className="py-2.5 pr-4 text-right text-[#f59e0b] font-medium">{day}</td>
                   <td className="py-2.5 pr-4 text-right text-[#6366f1] font-medium">{night}</td>
-                  <td className={`py-2.5 text-right font-medium ${overLimit ? 'text-red-600' : 'text-[#6a6a6a]'}`}>
+                  <td className={`py-2.5 pr-4 text-right font-medium ${overLimit ? 'text-red-600' : 'text-[#6a6a6a]'}`}>
                     {hours}h
                     {overLimit && <span className="ml-1 text-[10px] text-red-400">(limit {maxHoursForPeriod}h)</span>}
+                  </td>
+                  <td className="py-2.5 text-right">
+                    {streak > 0 ? (
+                      <span className={`inline-flex items-center gap-1 text-xs font-medium ${streak >= 5 ? 'text-[#f97316]' : 'text-[#6a6a6a]'}`}>
+                        {streak >= 5 && <Flame size={11} className="text-[#f97316]" />}
+                        {streak}d
+                      </span>
+                    ) : (
+                      <span className="text-xs text-[#aaaaaa]">—</span>
+                    )}
                   </td>
                 </tr>
                 )
               })}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-sm text-[#6a6a6a]">
+                  <td colSpan={8} className="py-12 text-center text-sm text-[#6a6a6a]">
                     No shifts found for this period.
                   </td>
                 </tr>
