@@ -3,3 +3,4 @@ dist
 .mastra
 .env
 storage.db
+.worktrees
