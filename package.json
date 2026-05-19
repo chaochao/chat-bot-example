@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
     "dev:api": "tsx watch src/api/server.ts",
@@ -37,12 +40,15 @@
     "zod": "latest"
   },
   "devDependencies": {
+    "@prisma/adapter-better-sqlite3": "^7.8.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.19",
     "@types/express": "latest",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "latest",
+    "better-sqlite3": "^12.10.0",
     "concurrently": "latest",
     "mastra": "latest",
     "prisma": "^7.8.0",
