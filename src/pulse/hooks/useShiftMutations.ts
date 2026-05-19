@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 
 export function useCreateShift() {
   const qc = useQueryClient()
@@ -18,7 +19,11 @@ export function useCreateShift() {
       if (!res.ok) throw new Error('Failed to create shift')
       return res.json()
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] })
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['shifts'] })
+      toast.success(`Shift created — ${data.staff.name}, ${data.department.name}`)
+    },
+    onError: () => toast.error('Failed to create shift')
   })
 }
 
@@ -26,28 +31,36 @@ export function useUpdateShift() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({
-      id, type, hours, status
-    }: { id: string; type: string; hours: number; status: string }) => {
+      id, staffId, departmentId, type, hours, status
+    }: { id: string; staffId: string; departmentId: string; type: string; hours: number; status: string }) => {
       const res = await fetch(`/api/pulse/shifts/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, hours, status })
+        body: JSON.stringify({ staffId, departmentId, type, hours, status })
       })
       if (!res.ok) throw new Error('Failed to update shift')
       return res.json()
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] })
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['shifts'] })
+      toast.info(`Shift updated — ${data.staff.name}, ${data.department.name}`)
+    },
+    onError: () => toast.error('Failed to update shift')
   })
 }
 
 export function useDeleteShift() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id }: { id: string; staffName: string; deptName: string }) => {
       const res = await fetch(`/api/pulse/shifts/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete shift')
       return res.json()
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] })
+    onSuccess: (_, { staffName, deptName }) => {
+      qc.invalidateQueries({ queryKey: ['shifts'] })
+      toast.error(`Shift deleted — ${staffName}, ${deptName}`)
+    },
+    onError: () => toast.error('Failed to delete shift')
   })
 }

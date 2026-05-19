@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { format, isSameMonth } from 'date-fns'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Pencil, Sun, Moon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import {
   getMonthGrid, getWeekDays,
@@ -19,8 +20,8 @@ import { useDepartments } from '@/pulse/hooks/useDepartments'
 import type { Shift, Department, ViewMode } from '@/pulse/types'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const SHIFT_TYPES = ['day', 'evening', 'night'] as const
-const SHIFT_LABELS = { day: 'Day', evening: 'Evening', night: 'Night' }
+const SHIFT_TYPES = ['day', 'night'] as const
+const SHIFT_LABELS = { day: 'Day (7am–7pm)', night: 'Night (7pm–7am)' }
 
 export function CalendarGrid() {
   const [viewMode, setViewMode] = useState<ViewMode>('month')
@@ -28,6 +29,7 @@ export function CalendarGrid() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [editingShift, setEditingShift] = useState<Shift | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [listShifts, setListShifts] = useState<Shift[] | null>(null)
 
   const { start, end } = getQueryRange(viewMode, currentDate)
   const { data: shifts = [] } = useShifts(start, end)
@@ -43,11 +45,22 @@ export function CalendarGrid() {
     setDialogOpen(true)
   }
 
-  function openEdit(shift: Shift, e: React.MouseEvent) {
+  function openCardClick(shifts: Shift[], e: React.MouseEvent) {
     e.stopPropagation()
+    if (shifts.length === 1) {
+      setEditingShift(shifts[0])
+      setSelectedDate(new Date(shifts[0].date))
+      setDialogOpen(true)
+    } else {
+      setListShifts(shifts)
+    }
+  }
+
+  function openShiftFromList(shift: Shift) {
     setEditingShift(shift)
     setSelectedDate(new Date(shift.date))
     setDialogOpen(true)
+    // keep listShifts alive so back button can restore it
   }
 
   function navigate(dir: 'prev' | 'next') {
@@ -108,7 +121,7 @@ export function CalendarGrid() {
             byDateDept={byDateDept}
             deptMap={deptMap}
             onCellClick={openCreate}
-            onShiftClick={openEdit}
+            onShiftClick={openCardClick}
           />
         ) : (
           <WeekBody
@@ -116,7 +129,7 @@ export function CalendarGrid() {
             byDateTypeDept={byDateTypeDept}
             deptMap={deptMap}
             onCellClick={openCreate}
-            onShiftClick={openEdit}
+            onShiftClick={openCardClick}
           />
         )}
       </div>
@@ -126,7 +139,14 @@ export function CalendarGrid() {
         date={selectedDate}
         shift={editingShift}
         departments={departments}
-        onClose={() => { setDialogOpen(false); setEditingShift(null) }}
+        onClose={() => { setDialogOpen(false); setEditingShift(null); setListShifts(null) }}
+        onBack={listShifts ? () => setDialogOpen(false) : undefined}
+      />
+
+      <ShiftListDialog
+        shifts={listShifts}
+        onEdit={openShiftFromList}
+        onClose={() => setListShifts(null)}
       />
     </div>
   )
@@ -139,7 +159,7 @@ function MonthBody({
   byDateDept: Record<string, Record<string, Shift[]>>
   deptMap: Record<string, Department>
   onCellClick: (d: Date) => void
-  onShiftClick: (s: Shift, e: React.MouseEvent) => void
+  onShiftClick: (shifts: Shift[], e: React.MouseEvent) => void
 }) {
   const weeks = getMonthGrid(currentDate)
 
@@ -154,21 +174,31 @@ function MonthBody({
           <div
             key={i}
             className={cn(
-              'h-[140px] border-b border-r border-[#ebebeb] cursor-pointer transition-colors flex flex-col',
+              'group h-[140px] border-b border-r border-[#ebebeb] transition-colors flex flex-col',
               inMonth ? 'bg-white hover:bg-[#fafafa]' : 'bg-[#fafafa]',
             )}
-            onClick={() => onCellClick(day)}
           >
-            <div className="px-2 pt-2 flex-none">
+            <div className="px-2 pt-2 flex-none flex items-center justify-between">
               <div className={cn(
-                'text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mb-1',
+                'text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full',
                 isToday(day) ? 'bg-[#ff385c] text-white' :
                 inMonth ? 'text-[#222222]' : 'text-[#c1c1c1]'
               )}>
                 {format(day, 'd')}
               </div>
+              <div className="relative">
+                <button
+                  onClick={() => onCellClick(day)}
+                  className="peer opacity-0 group-hover:opacity-100 transition-opacity w-5 h-5 flex items-center justify-center rounded-full text-[#6a6a6a] hover:bg-[#ebebeb] hover:text-[#222222]"
+                >
+                  <Plus size={12} />
+                </button>
+                <span className="pointer-events-none absolute right-0 top-6 z-20 whitespace-nowrap rounded-md bg-[#222222] px-2 py-1 text-[11px] text-white opacity-0 peer-hover:opacity-100 transition-opacity">
+                  Add shift — {format(day, 'MMM d')}
+                </span>
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-2 pb-2 min-h-0">
+            <div className="flex-1 overflow-y-auto px-2 pb-1 min-h-0 mt-1">
               {Object.entries(dayDepts).map(([deptId, depShifts]) => {
                 const dept = deptMap[deptId]
                 if (!dept) return null
@@ -196,7 +226,7 @@ function WeekBody({
   byDateTypeDept: Record<string, Record<string, Record<string, Shift[]>>>
   deptMap: Record<string, Department>
   onCellClick: (d: Date) => void
-  onShiftClick: (s: Shift, e: React.MouseEvent) => void
+  onShiftClick: (shifts: Shift[], e: React.MouseEvent) => void
 }) {
   const days = getWeekDays(currentDate)
 
@@ -236,5 +266,52 @@ function WeekBody({
         </div>
       ))}
     </div>
+  )
+}
+
+function ShiftListDialog({
+  shifts, onEdit, onClose
+}: {
+  shifts: Shift[] | null
+  onEdit: (shift: Shift) => void
+  onClose: () => void
+}) {
+  if (!shifts) return null
+  const dept = shifts[0]?.department
+  const date = shifts[0] ? format(new Date(shifts[0].date), 'MMM d, yyyy') : ''
+
+  return (
+    <Dialog open={!!shifts} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full flex-none" style={{ backgroundColor: dept?.color }} />
+            {dept?.name} — {date}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2 py-1">
+          {shifts.map((shift) => (
+            <div key={shift.id} className="flex items-center justify-between px-3 py-2 rounded-lg border border-[#ebebeb]">
+              <div className="flex items-center gap-2.5">
+                <span className="w-2 h-2 rounded-full flex-none" style={{ backgroundColor: dept?.color }} />
+                <div>
+                  <p className="text-sm text-[#222222]">{shift.staff.name}</p>
+                  <p className="text-xs text-[#6a6a6a] flex items-center gap-1">
+                    {shift.staff.role} ·
+                    {shift.type === 'day'
+                      ? <Sun size={11} className="text-[#f59e0b]" />
+                      : <Moon size={11} className="text-[#6366f1]" />
+                    }
+                  </p>
+                </div>
+              </div>
+              <Button size="sm" variant="outline" className="h-7 gap-1.5" onClick={() => onEdit(shift)}>
+                <Pencil size={12} /> Edit
+              </Button>
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -1,4 +1,4 @@
-export type ShiftType = 'day' | 'evening' | 'night'
+export type ShiftType = 'day' | 'night'
 export type ShiftStatus = 'scheduled' | 'completed' | 'absent' | 'swapped'
 export type ViewMode = 'month' | 'week'
 

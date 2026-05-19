@@ -6,6 +6,7 @@ import { ChatApp } from './ChatApp'
 import { PulseApp } from '@/pulse/PulseApp'
 import { CalendarPage } from '@/pulse/pages/CalendarPage'
 import { AnalyticsPage } from '@/pulse/pages/AnalyticsPage'
+import { Toaster } from 'sonner'
 import './styles.css'
 
 const queryClient = new QueryClient({
@@ -15,6 +16,7 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
+      <Toaster position="bottom-right" richColors />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<ChatApp />} />

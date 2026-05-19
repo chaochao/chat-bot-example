@@ -29,16 +29,16 @@ async function main() {
     { name: 'Alice Chen', role: 'RN', departmentId: icu.id, certifications: 'ICU,ACLS', preferredShift: 'day', contractHoursPerWeek: 36 },
     { name: 'Bob Martinez', role: 'RN', departmentId: icu.id, certifications: 'ICU,ACLS', preferredShift: 'night', contractHoursPerWeek: 36 },
     { name: 'Dr. Sarah Kim', role: 'MD', departmentId: icu.id, certifications: 'ICU,ACLS', preferredShift: 'day', contractHoursPerWeek: 48 },
-    { name: 'James Wilson', role: 'RN', departmentId: ed.id, certifications: 'ACLS,TNCC', preferredShift: 'evening', contractHoursPerWeek: 36 },
+    { name: 'James Wilson', role: 'RN', departmentId: ed.id, certifications: 'ACLS,TNCC', preferredShift: 'night', contractHoursPerWeek: 36 },
     { name: 'Maria Lopez', role: 'RN', departmentId: ed.id, certifications: 'ACLS,TNCC', preferredShift: 'day', contractHoursPerWeek: 36 },
     { name: 'Dr. Kevin Park', role: 'MD', departmentId: ed.id, certifications: 'ACLS,TNCC', preferredShift: 'none', contractHoursPerWeek: 48 },
     { name: 'Linda Zhang', role: 'RN', departmentId: surgery.id, certifications: 'OR,ACLS', preferredShift: 'day', contractHoursPerWeek: 36 },
     { name: 'Tom Brown', role: 'Tech', departmentId: surgery.id, certifications: 'OR', preferredShift: 'day', contractHoursPerWeek: 40 },
     { name: 'Dr. Anna White', role: 'MD', departmentId: surgery.id, certifications: 'OR,ACLS', preferredShift: 'day', contractHoursPerWeek: 48 },
-    { name: 'Rachel Green', role: 'RN', departmentId: cardiology.id, certifications: 'ACLS', preferredShift: 'evening', contractHoursPerWeek: 36 },
+    { name: 'Rachel Green', role: 'RN', departmentId: cardiology.id, certifications: 'ACLS', preferredShift: 'night', contractHoursPerWeek: 36 },
     { name: 'Mike Davis', role: 'LPN', departmentId: cardiology.id, certifications: 'ACLS', preferredShift: 'night', contractHoursPerWeek: 36 },
     { name: 'Susan Hall', role: 'RN', departmentId: general.id, certifications: '', preferredShift: 'day', contractHoursPerWeek: 36 },
-    { name: 'Chris Evans', role: 'RN', departmentId: general.id, certifications: '', preferredShift: 'evening', contractHoursPerWeek: 36 },
+    { name: 'Chris Evans', role: 'RN', departmentId: general.id, certifications: '', preferredShift: 'night', contractHoursPerWeek: 36 },
     { name: 'Nurse Joy', role: 'LPN', departmentId: general.id, certifications: '', preferredShift: 'night', contractHoursPerWeek: 32 },
     { name: 'Dr. Bruce Lee', role: 'MD', departmentId: general.id, certifications: '', preferredShift: 'day', contractHoursPerWeek: 48 },
   ]
@@ -47,7 +47,7 @@ async function main() {
 
   const today = startOfDay(new Date())
   const startDate = subDays(today, 10)
-  const shiftTypes = ['day', 'evening', 'night'] as const
+  const shiftTypes = ['day', 'night'] as const
   const shiftData: Parameters<typeof prisma.shift.create>[0]['data'][] = []
 
   for (let d = 0; d < 21; d++) {
@@ -57,7 +57,7 @@ async function main() {
 
     for (const member of allStaff) {
       if ((d + allStaff.indexOf(member)) % 7 < 4 || isWeekend) {
-        const type = shiftTypes[d % 3]
+        const type = shiftTypes[d % 2]
         shiftData.push({
           staffId: member.id,
           departmentId: member.departmentId,

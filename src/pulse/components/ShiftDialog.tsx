@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, ChevronLeft } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from '@/components/ui/dialog'
@@ -19,15 +19,25 @@ interface ShiftDialogProps {
   shift: Shift | null
   departments: Department[]
   onClose: () => void
+  onBack?: () => void
 }
 
-export function ShiftDialog({ open, date, shift, departments, onClose }: ShiftDialogProps) {
+export function ShiftDialog({ open, date, shift, departments, onClose, onBack }: ShiftDialogProps) {
   const isEdit = shift !== null
 
   const [departmentId, setDepartmentId] = useState(shift?.departmentId ?? '')
   const [staffId, setStaffId] = useState(shift?.staffId ?? '')
   const [shiftType, setShiftType] = useState<ShiftType>(shift?.type ?? 'day')
-  const [hours, setHours] = useState(String(shift?.hours ?? 12))
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setDepartmentId(shift?.departmentId ?? '')
+      setStaffId(shift?.staffId ?? '')
+      setShiftType(shift?.type ?? 'day')
+      setConfirmDelete(false)
+    }
+  }, [open])
 
   const { data: allStaff = [] } = useStaff()
   const createShift = useCreateShift()
@@ -53,16 +63,16 @@ export function ShiftDialog({ open, date, shift, departments, onClose }: ShiftDi
   async function handleSave() {
     if (!date || !departmentId || !staffId) return
     if (isEdit) {
-      await updateShift.mutateAsync({ id: shift.id, type: shiftType, hours: Number(hours), status: shift.status })
+      await updateShift.mutateAsync({ id: shift.id, staffId, departmentId, type: shiftType, hours: 12, status: shift.status })
     } else {
-      await createShift.mutateAsync({ staffId, departmentId, date: date.toISOString(), type: shiftType, hours: Number(hours) })
+      await createShift.mutateAsync({ staffId, departmentId, date: date.toISOString(), type: shiftType, hours: 12 })
     }
     onClose()
   }
 
   async function handleDelete() {
     if (!shift) return
-    await deleteShift.mutateAsync(shift.id)
+    await deleteShift.mutateAsync({ id: shift.id, staffName: shift.staff.name, deptName: shift.department.name })
     onClose()
   }
 
@@ -70,7 +80,15 @@ export function ShiftDialog({ open, date, shift, departments, onClose }: ShiftDi
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="w-6 h-6 flex items-center justify-center rounded-md text-[#6a6a6a] hover:bg-[#f2f2f2] transition-colors flex-none"
+              >
+                <ChevronLeft size={16} />
+              </button>
+            )}
             {isEdit ? 'Edit Shift' : `Add Shift — ${date ? format(date, 'MMM d, yyyy') : ''}`}
           </DialogTitle>
         </DialogHeader>
@@ -81,9 +99,12 @@ export function ShiftDialog({ open, date, shift, departments, onClose }: ShiftDi
             <Select
               value={departmentId}
               onValueChange={(v) => { setDepartmentId(v ?? ''); setStaffId('') }}
-              disabled={isEdit}
             >
-              <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Select department">
+                  {departments.find(d => d.id === departmentId)?.name}
+                </SelectValue>
+              </SelectTrigger>
               <SelectContent>
                 {departments.map((d) => (
                   <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
@@ -94,9 +115,11 @@ export function ShiftDialog({ open, date, shift, departments, onClose }: ShiftDi
 
           <div className="space-y-1.5">
             <Label>Staff</Label>
-            <Select value={staffId} onValueChange={(v) => setStaffId(v ?? '')} disabled={isEdit || !departmentId}>
+            <Select value={staffId} onValueChange={(v) => setStaffId(v ?? '')} disabled={!departmentId}>
               <SelectTrigger>
-                <SelectValue placeholder={departmentId ? 'Select staff member' : 'Select department first'} />
+                <SelectValue placeholder={departmentId ? 'Select staff member' : 'Select department first'}>
+                  {selectedStaff && `${selectedStaff.name} — ${selectedStaff.role}`}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {filteredStaff.map((s) => (
@@ -112,19 +135,7 @@ export function ShiftDialog({ open, date, shift, departments, onClose }: ShiftDi
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="day">Day (7am – 7pm)</SelectItem>
-                <SelectItem value="evening">Evening (3pm – 11pm)</SelectItem>
                 <SelectItem value="night">Night (7pm – 7am)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Duration</Label>
-            <Select value={hours} onValueChange={(v) => setHours(v ?? '12')}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="8">8 hours</SelectItem>
-                <SelectItem value="12">12 hours</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -139,22 +150,35 @@ export function ShiftDialog({ open, date, shift, departments, onClose }: ShiftDi
 
         <DialogFooter className="gap-2 sm:justify-between">
           <div>
-            {isEdit && (
-              <Button variant="destructive" size="sm" onClick={handleDelete} disabled={isPending}>
+            {isEdit && !confirmDelete && (
+              <Button variant="destructive" size="sm" onClick={() => setConfirmDelete(true)} disabled={isPending}>
                 Delete
               </Button>
             )}
+            {isEdit && confirmDelete && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[#6a6a6a]">Delete this shift?</span>
+                <Button variant="destructive" size="sm" onClick={handleDelete} disabled={isPending}>
+                  Confirm
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>
+                  No
+                </Button>
+              </div>
+            )}
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={isPending || !departmentId || !staffId}
-            >
-              {isEdit ? 'Update' : 'Add Shift'}
-            </Button>
-          </div>
+          {!confirmDelete && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+              <Button
+                size="sm"
+                onClick={handleSave}
+                disabled={isPending || !departmentId || !staffId}
+              >
+                {isEdit ? 'Update' : 'Add Shift'}
+              </Button>
+            </div>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -62,10 +62,10 @@ router.post('/shifts', async (req, res) => {
 
 router.put('/shifts/:id', async (req, res) => {
   try {
-    const { type, hours, status } = req.body
+    const { staffId, departmentId, type, hours, status } = req.body
     const shift = await prisma.shift.update({
       where: { id: req.params.id },
-      data: { type, hours: Number(hours), status },
+      data: { staffId, departmentId, type, hours: Number(hours), status },
       include: { staff: { include: { department: true } }, department: true }
     })
     res.json(shift)

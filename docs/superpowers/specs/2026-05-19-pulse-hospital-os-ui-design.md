@@ -85,7 +85,11 @@ Fields:
 
 On submit: POST `/api/pulse/shifts` → invalidate `['shifts']` cache → calendar refreshes.
 
-No constraint validation in Step 1 — clean CRUD only. Constraint checking is Step 2.
+Inline warnings shown (non-blocking — you can still save):
+- Staff not certified for the selected department
+- Staff already assigned on the same date + shift type
+
+Legal/labor compliance rules (max hours, min rest) are deferred to Step 2.
 
 ### Edit Shift Dialog
 Triggered by clicking an existing shift card. Same fields as Add, pre-filled. Includes a **Delete** button (destructive, with confirmation).
