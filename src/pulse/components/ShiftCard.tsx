@@ -14,15 +14,13 @@ export function ShiftCard({ department, shifts, onCardClick }: ShiftCardProps) {
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <div
-          className="rounded-md px-2 py-1 text-xs cursor-pointer mb-1 border-l-[3px] select-none"
-          style={{ backgroundColor: bg, borderColor: department.color }}
-          onClick={(e) => { e.stopPropagation(); onCardClick(shifts[0], e) }}
-        >
-          <div className="font-semibold text-[#222222] truncate leading-tight">{department.name}</div>
-          <div className="text-[#6a6a6a] truncate leading-tight mt-0.5">{summary}</div>
-        </div>
+      <PopoverTrigger
+        className="rounded-md px-2 py-1 text-xs cursor-pointer mb-1 border-l-[3px] select-none w-full text-left block"
+        style={{ backgroundColor: bg, borderColor: department.color }}
+        onClick={(e) => { e.stopPropagation(); onCardClick(shifts[0], e) }}
+      >
+        <div className="font-semibold text-[#222222] truncate leading-tight">{department.name}</div>
+        <div className="text-[#6a6a6a] truncate leading-tight mt-0.5">{summary}</div>
       </PopoverTrigger>
       <PopoverContent className="w-52 p-3" side="right" onClick={(e) => e.stopPropagation()}>
         <p className="text-xs font-semibold text-[#222222] mb-2">{department.name}</p>

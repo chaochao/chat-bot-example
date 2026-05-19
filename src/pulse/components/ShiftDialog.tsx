@@ -80,7 +80,7 @@ export function ShiftDialog({ open, date, shift, departments, onClose }: ShiftDi
             <Label>Department</Label>
             <Select
               value={departmentId}
-              onValueChange={(v) => { setDepartmentId(v); setStaffId('') }}
+              onValueChange={(v) => { setDepartmentId(v ?? ''); setStaffId('') }}
               disabled={isEdit}
             >
               <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
@@ -94,7 +94,7 @@ export function ShiftDialog({ open, date, shift, departments, onClose }: ShiftDi
 
           <div className="space-y-1.5">
             <Label>Staff</Label>
-            <Select value={staffId} onValueChange={setStaffId} disabled={isEdit || !departmentId}>
+            <Select value={staffId} onValueChange={(v) => setStaffId(v ?? '')} disabled={isEdit || !departmentId}>
               <SelectTrigger>
                 <SelectValue placeholder={departmentId ? 'Select staff member' : 'Select department first'} />
               </SelectTrigger>
@@ -108,7 +108,7 @@ export function ShiftDialog({ open, date, shift, departments, onClose }: ShiftDi
 
           <div className="space-y-1.5">
             <Label>Shift Type</Label>
-            <Select value={shiftType} onValueChange={(v) => setShiftType(v as ShiftType)}>
+            <Select value={shiftType} onValueChange={(v) => setShiftType((v ?? 'day') as ShiftType)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="day">Day (7am – 7pm)</SelectItem>
@@ -120,7 +120,7 @@ export function ShiftDialog({ open, date, shift, departments, onClose }: ShiftDi
 
           <div className="space-y-1.5">
             <Label>Duration</Label>
-            <Select value={hours} onValueChange={setHours}>
+            <Select value={hours} onValueChange={(v) => setHours(v ?? '12')}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="8">8 hours</SelectItem>
