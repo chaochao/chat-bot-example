@@ -154,30 +154,34 @@ function MonthBody({
           <div
             key={i}
             className={cn(
-              'min-h-[120px] border-b border-r border-[#ebebeb] p-2 cursor-pointer transition-colors',
+              'h-[140px] border-b border-r border-[#ebebeb] cursor-pointer transition-colors flex flex-col',
               inMonth ? 'bg-white hover:bg-[#fafafa]' : 'bg-[#fafafa]',
             )}
             onClick={() => onCellClick(day)}
           >
-            <div className={cn(
-              'text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mb-1',
-              isToday(day) ? 'bg-[#ff385c] text-white' :
-              inMonth ? 'text-[#222222]' : 'text-[#c1c1c1]'
-            )}>
-              {format(day, 'd')}
+            <div className="px-2 pt-2 flex-none">
+              <div className={cn(
+                'text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full mb-1',
+                isToday(day) ? 'bg-[#ff385c] text-white' :
+                inMonth ? 'text-[#222222]' : 'text-[#c1c1c1]'
+              )}>
+                {format(day, 'd')}
+              </div>
             </div>
-            {Object.entries(dayDepts).map(([deptId, depShifts]) => {
-              const dept = deptMap[deptId]
-              if (!dept) return null
-              return (
-                <ShiftCard
-                  key={deptId}
-                  department={dept}
-                  shifts={depShifts}
-                  onCardClick={onShiftClick}
-                />
-              )
-            })}
+            <div className="flex-1 overflow-y-auto px-2 pb-2 min-h-0">
+              {Object.entries(dayDepts).map(([deptId, depShifts]) => {
+                const dept = deptMap[deptId]
+                if (!dept) return null
+                return (
+                  <ShiftCard
+                    key={deptId}
+                    department={dept}
+                    shifts={depShifts}
+                    onCardClick={onShiftClick}
+                  />
+                )
+              })}
+            </div>
           </div>
         )
       })}
