@@ -7,7 +7,9 @@
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
     "dev:api": "tsx watch src/api/server.ts",
     "dev:web": "vite --host 0.0.0.0",
-    "build": "tsc --noEmit && vite build && mastra build"
+    "build": "tsc --noEmit && vite build && mastra build",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
