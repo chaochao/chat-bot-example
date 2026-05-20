@@ -4,9 +4,10 @@ import { cn } from '@/lib/utils'
 
 interface SidebarProps {
   onAskPulse: () => void
+  drawerOpen?: boolean
 }
 
-export function Sidebar({ onAskPulse }: SidebarProps) {
+export function Sidebar({ onAskPulse, drawerOpen }: SidebarProps) {
   const navItem = (to: string, end: boolean, icon: React.ReactNode, label: string) => (
     <NavLink
       to={to}
@@ -36,7 +37,10 @@ export function Sidebar({ onAskPulse }: SidebarProps) {
         {navItem('/pulse/staff', false, <User size={16} />, 'Staff')}
         <button
           onClick={onAskPulse}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-[#6a6a6a] hover:bg-[#f7f7f7] hover:text-[#222222] transition-colors"
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+            drawerOpen ? 'bg-[#f2f2f2] text-[#222222]' : 'text-[#6a6a6a] hover:bg-[#f7f7f7] hover:text-[#222222]'
+          )}
         >
           <Sparkles size={16} />
           Ask Pulse

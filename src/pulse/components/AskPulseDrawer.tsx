@@ -1,20 +1,39 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Sparkles, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 
 interface AskPulseDrawerProps {
+  open: boolean
   onClose: () => void
 }
 
-export function AskPulseDrawer({ onClose }: AskPulseDrawerProps) {
+export function AskPulseDrawer({ open, onClose }: AskPulseDrawerProps) {
   const [input, setInput] = useState('')
+  const [visible, setVisible] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true)
+      const t = setTimeout(() => setVisible(true), 16)
+      return () => clearTimeout(t)
+    } else {
+      setVisible(false)
+      const t = setTimeout(() => setMounted(false), 250)
+      return () => clearTimeout(t)
+    }
+  }, [open])
+
+  if (!mounted) return null
 
   return (
-    <div className="absolute left-0 top-0 h-full w-80 bg-white border-r border-[#dddddd] shadow-xl z-10 flex flex-col">
+    <div
+      className={`absolute left-0 top-0 h-full w-80 bg-white border-r border-[#dddddd] shadow-xl z-10 flex flex-col transition-transform duration-[250ms] ease-out ${visible ? 'translate-x-0' : '-translate-x-full'}`}
+    >
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#dddddd]">
         <div className="flex items-center gap-2">
-          <Sparkles size={14} className="text-[#ff385c]" />
+          <Sparkles size={14} className="text-[#4f86c6]" />
           <span className="font-semibold text-sm text-[#222222]">Ask Pulse</span>
         </div>
         <button
@@ -26,8 +45,8 @@ export function AskPulseDrawer({ onClose }: AskPulseDrawerProps) {
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-[#ff385c]/10 flex items-center justify-center">
-          <Sparkles size={22} className="text-[#ff385c]" />
+        <div className="w-12 h-12 rounded-2xl bg-[#4f86c6]/10 flex items-center justify-center">
+          <Sparkles size={22} className="text-[#4f86c6]" />
         </div>
         <div>
           <p className="font-semibold text-[#222222] text-sm">Good morning!</p>
